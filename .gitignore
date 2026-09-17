@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+embedding_cache.pkl
+.streamlit/secrets.toml
+.env
