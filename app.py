@@ -46,7 +46,44 @@ st.set_page_config(
     page_icon="🤖",
     layout="wide",
 )
+st.markdown("""
+<style>
 
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap');
+
+html, body, [class*="css"] {
+    direction: rtl;
+    text-align: right;
+    font-family: 'Vazirmatn', Tahoma, sans-serif;
+}
+
+.stApp {
+    direction: rtl;
+}
+
+h1, h2, h3, p, div {
+    direction: rtl;
+    text-align: right;
+}
+
+.stTextInput > div > div > input {
+    direction: rtl;
+    text-align: right;
+    font-family: 'Vazirmatn', Tahoma, sans-serif;
+}
+
+.stTextArea textarea {
+    direction: rtl;
+    text-align: right;
+    font-family: 'Vazirmatn', Tahoma, sans-serif;
+}
+
+button {
+    font-family: 'Vazirmatn', Tahoma, sans-serif;
+}
+
+</style>
+""", unsafe_allow_html=True)
 
 # =========================================================
 # API Key
