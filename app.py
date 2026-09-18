@@ -3,10 +3,10 @@ import pickle
 import re
 import os
 from pathlib import Path
+
 import numpy as np
 import requests
 import streamlit as st
-
 
 # =========================================================
 # تنظیمات
@@ -45,257 +45,48 @@ st.set_page_config(
     page_icon="🤖",
     layout="wide",
 )
-
-# =========================================================
-# ظاهر و استایل فارسی
-# =========================================================
-
-st.markdown(
-    """
+st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap');
 
-/* -------------------------------------------------------
-   تنظیمات عمومی
-------------------------------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap');
 
-html,
-body,
-.stApp,
-[data-testid="stAppViewContainer"],
-[data-testid="stHeader"],
-[data-testid="stMain"],
-section.main {
-    direction: rtl !important;
-}
-
-html,
-body,
-.stApp,
-[data-testid="stAppViewContainer"],
-[data-testid="stMain"] {
-    font-family: "Vazirmatn", Tahoma, Arial, sans-serif !important;
-}
-
-/* همه متن‌ها فارسی و RTL */
-.stApp p,
-.stApp span,
-.stApp label,
-.stApp div,
-.stApp input,
-.stApp textarea,
-.stApp button,
-.stApp h1,
-.stApp h2,
-.stApp h3,
-.stApp h4,
-.stApp h5,
-.stApp h6 {
-    font-family: "Vazirmatn", Tahoma, Arial, sans-serif !important;
-}
-
-/* -------------------------------------------------------
-   هدر
-------------------------------------------------------- */
-
-.page-header {
-    direction: rtl;
-    text-align: center;
-    margin-top: 0.5rem;
-    margin-bottom: 2rem;
-    padding: 0 1rem;
-}
-
-.page-header h1 {
-    direction: rtl;
-    text-align: center !important;
-    font-size: 2.1rem;
-    font-weight: 700;
-    line-height: 1.6;
-    margin: 0 0 0.8rem 0;
-}
-
-.page-header p {
-    direction: rtl;
-    text-align: center !important;
-    font-size: 1.02rem;
-    line-height: 2;
-    margin: 0 auto;
-    max-width: 900px;
-}
-
-/* -------------------------------------------------------
-   متن و ورودی سؤال
-------------------------------------------------------- */
-
-[data-testid="stTextArea"] label,
-[data-testid="stTextArea"] textarea {
-    direction: rtl !important;
-    text-align: right !important;
-}
-
-[data-testid="stTextArea"] textarea {
-    font-size: 1rem !important;
-    line-height: 2 !important;
-    padding: 0.9rem !important;
-}
-
-/* placeholder */
-[data-testid="stTextArea"] textarea::placeholder {
-    direction: rtl !important;
-    text-align: right !important;
-    opacity: 0.75;
-}
-
-/* -------------------------------------------------------
-   دکمه
-------------------------------------------------------- */
-
-[data-testid="stButton"] button {
-    direction: rtl !important;
-    text-align: center !important;
-    font-family: "Vazirmatn", Tahoma, Arial, sans-serif !important;
-    font-size: 1rem !important;
-    font-weight: 600 !important;
-    min-height: 3rem;
-}
-
-/* -------------------------------------------------------
-   پیام‌ها
-------------------------------------------------------- */
-
-[data-testid="stAlert"] {
-    direction: rtl !important;
-    text-align: right !important;
-}
-
-[data-testid="stAlert"] p {
-    direction: rtl !important;
-    text-align: right !important;
-    line-height: 2 !important;
-}
-
-/* -------------------------------------------------------
-   عنوان‌های RTL
-------------------------------------------------------- */
-
-.rtl-title {
-    direction: rtl !important;
-    text-align: right !important;
-    font-family: "Vazirmatn", Tahoma, Arial, sans-serif !important;
-    font-size: 1.35rem;
-    font-weight: 700;
-    line-height: 1.8;
-    margin-top: 1.2rem;
-    margin-bottom: 0.8rem;
-}
-
-/* -------------------------------------------------------
-   کارت پاسخ
-------------------------------------------------------- */
-
-.answer-card {
+html, body, [class*="css"] {
     direction: rtl;
     text-align: right;
-    font-family: "Vazirmatn", Tahoma, Arial, sans-serif;
-    line-height: 2.1;
-    font-size: 1.03rem;
-    padding: 1.2rem 1.3rem;
-    margin: 0.5rem 0 1rem 0;
-    border: 1px solid rgba(128, 128, 128, 0.25);
-    border-radius: 14px;
-    background: rgba(128, 128, 128, 0.06);
+    font-family: 'Vazirmatn', Tahoma, sans-serif !important;
 }
 
-.answer-card p,
-.answer-card li,
-.answer-card div {
+.stApp {
     direction: rtl;
-    text-align: right !important;
+    font-family: 'Vazirmatn', Tahoma, sans-serif !important;
 }
 
-/* -------------------------------------------------------
-   Expander
-------------------------------------------------------- */
+p, span, div, input, textarea, button {
+    font-family: 'Vazirmatn', Tahoma, sans-serif !important;
+}
 
-[data-testid="stExpander"] {
+input, textarea {
     direction: rtl !important;
     text-align: right !important;
 }
-
-[data-testid="stExpander"] summary {
-    direction: rtl !important;
-    text-align: right !important;
-    font-family: "Vazirmatn", Tahoma, Arial, sans-serif !important;
+.stTextInput > div > div > input {
+    direction: rtl;
+    text-align: right;
+    font-family: 'Vazirmatn', Tahoma, sans-serif;
 }
 
-[data-testid="stExpander"] summary span {
-    direction: rtl !important;
-    text-align: right !important;
+.stTextArea textarea {
+    direction: rtl;
+    text-align: right;
+    font-family: 'Vazirmatn', Tahoma, sans-serif;
 }
 
-[data-testid="stExpander"] p,
-[data-testid="stExpander"] div,
-[data-testid="stExpander"] span {
-    direction: rtl !important;
-    text-align: right !important;
+button {
+    font-family: 'Vazirmatn', Tahoma, sans-serif;
 }
 
-/* -------------------------------------------------------
-   متن بخش‌های بازیابی‌شده
-------------------------------------------------------- */
-
-.retrieved-title {
-    direction: rtl !important;
-    text-align: right !important;
-    font-family: "Vazirmatn", Tahoma, Arial, sans-serif !important;
-    font-weight: 600;
-    line-height: 2;
-}
-
-/* جلوگیری از چپ‌چین شدن متن‌های Markdown */
-.stMarkdown,
-[data-testid="stMarkdownContainer"] {
-    direction: rtl !important;
-    text-align: right !important;
-}
-
-[data-testid="stMarkdownContainer"] p,
-[data-testid="stMarkdownContainer"] li,
-[data-testid="stMarkdownContainer"] h1,
-[data-testid="stMarkdownContainer"] h2,
-[data-testid="stMarkdownContainer"] h3,
-[data-testid="stMarkdownContainer"] h4,
-[data-testid="stMarkdownContainer"] h5,
-[data-testid="stMarkdownContainer"] h6 {
-    direction: rtl !important;
-    text-align: right !important;
-    line-height: 2 !important;
-}
-
-/* -------------------------------------------------------
-   کد و متن‌های فنی داخل Streamlit
-------------------------------------------------------- */
-
-code,
-pre {
-    direction: ltr;
-    text-align: left;
-}
-
-/* -------------------------------------------------------
-   حذف برخی فاصله‌های اضافی
-------------------------------------------------------- */
-
-.block-container {
-    padding-top: 2rem !important;
-    padding-bottom: 3rem !important;
-}
 </style>
-""",
-    unsafe_allow_html=True,
-)
-
+""", unsafe_allow_html=True)
 
 # =========================================================
 # API Key
@@ -308,7 +99,6 @@ def get_api_key():
         یا موقتاً در محیط سیستم قرار بده.
 
     در Streamlit Cloud نیز باید همین Secret را تعریف کنی.
-    در Render نیز از Environment Variable خوانده می‌شود.
     """
 
     try:
@@ -348,10 +138,14 @@ def split_text(text: str):
     متن را بر اساس تعداد تقریبی کلمات به chunkهای کوچک تقسیم می‌کند.
     به دلیل محدودیت توکن مدل embedding، chunk کوچک انتخاب شده است.
     """
+
     text = re.sub(r"\n{3,}", "\n\n", text)
+
     words = text.split()
+
     if not words:
         return []
+
     step = CHUNK_SIZE - CHUNK_OVERLAP
     chunks = []
 
@@ -364,6 +158,8 @@ def split_text(text: str):
         chunks.append(" ".join(chunk_words))
 
     return chunks
+
+
 # =========================================================
 # دریافت فایل
 # =========================================================
@@ -377,6 +173,8 @@ def download_file():
     response.raise_for_status()
 
     return response.text
+
+
 # =========================================================
 # Embedding
 # =========================================================
@@ -409,9 +207,7 @@ def create_embeddings(texts):
         if response.status_code != 200:
             raise RuntimeError(
                 "Embedding Error "
-                f"{response.status_code}
-
-"
+                f"{response.status_code}\n\n"
                 f"{response.text}"
             )
 
@@ -525,9 +321,7 @@ def embed_query(question):
     if response.status_code != 200:
         raise RuntimeError(
             "Query Embedding Error "
-            f"{response.status_code}
-
-"
+            f"{response.status_code}\n\n"
             f"{response.text}"
         )
 
@@ -592,8 +386,7 @@ def ask_chat(question, results):
 """
         )
 
-    context = "
-".join(context_parts)
+    context = "\n".join(context_parts)
 
     payload = {
         "model": CHAT_MODEL,
@@ -643,9 +436,7 @@ def ask_chat(question, results):
     if response.status_code != 200:
         raise RuntimeError(
             "Chat Error "
-            f"{response.status_code}
-
-"
+            f"{response.status_code}\n\n"
             f"{response.text}"
         )
 
@@ -658,21 +449,13 @@ def ask_chat(question, results):
 # رابط کاربری
 # =========================================================
 
-# هدر وسط‌چین
-st.markdown(
-    """
-<div class="page-header">
-    <h1>🤖 پرسش از فایل با هوش مصنوعی</h1>
-    <p>
-        سؤال خود را درباره محتوای فایل وارد کنید.
-        سیستم ابتدا جست‌وجوی معنایی انجام می‌دهد
-        و سپس فقط بخش‌های مرتبط را به مدل می‌فرستد.
-    </p>
-</div>
-""",
-    unsafe_allow_html=True,
-)
+st.title("🤖 پرسش از فایل با هوش مصنوعی")
 
+st.write(
+    "سؤال خود را درباره محتوای فایل وارد کنید. "
+    "سیستم ابتدا جست‌وجوی معنایی انجام می‌دهد "
+    "و سپس فقط بخش‌های مرتبط را به مدل می‌فرستد."
+)
 
 if not API_KEY:
     st.error(
@@ -706,9 +489,7 @@ try:
         )
 
 except Exception as e:
-    st.error(f"خطا در آماده‌سازی فایل:
-
-{e}")
+    st.error(f"خطا در آماده‌سازی فایل:\n\n{e}")
     st.stop()
 
 
@@ -751,42 +532,20 @@ if ask_button:
                 results,
             )
 
-        # عنوان پاسخ: راست‌چین
-        st.markdown(
-            '<div class="rtl-title">پاسخ</div>',
-            unsafe_allow_html=True,
-        )
+        st.subheader("پاسخ")
 
-        # کارت پاسخ
-        st.markdown(
-            '<div class="answer-card">',
-            unsafe_allow_html=True,
-        )
+        st.markdown(answer)
 
-        st.markdown(
-            answer,
-            unsafe_allow_html=True,
-        )
-
-        st.markdown(
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        # بخش‌های بازیابی‌شده
         with st.expander("مشاهده بخش‌های بازیابی‌شده"):
             for i, result in enumerate(results):
                 st.markdown(
-                    f'<div class="retrieved-title">بخش {i + 1} — '
-                    f'Similarity: {result["score"]:.4f}</div>',
-                    unsafe_allow_html=True,
+                    f"**بخش {i + 1} — "
+                    f"Similarity: {result['score']:.4f}**"
                 )
                 st.write(result["chunk"])
                 st.divider()
 
     except Exception as e:
         st.error(
-            f"خطا در پردازش سؤال:
-
-{e}"
+            f"خطا در پردازش سؤال:\n\n{e}"
         )
