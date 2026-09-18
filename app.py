@@ -3,6 +3,7 @@ import pickle
 import re
 import os
 from pathlib import Path
+
 import numpy as np
 import requests
 import streamlit as st
@@ -448,19 +449,13 @@ def ask_chat(question, results):
 # رابط کاربری
 # =========================================================
 
-st.markdown("""
-<div class="page-header">
+st.title("🤖 پرسش از فایل با هوش مصنوعی")
 
-<h1>🤖 پرسش از فایل با هوش مصنوعی</h1>
-
-<p>
-سؤال خود را درباره محتوای فایل وارد کنید.
-سیستم ابتدا جست‌وجوی معنایی انجام می‌دهد
-و سپس فقط بخش‌های مرتبط را به مدل می‌فرستد.
-</p>
-
-</div>
-""", unsafe_allow_html=True)
+st.write(
+    "سؤال خود را درباره محتوای فایل وارد کنید. "
+    "سیستم ابتدا جست‌وجوی معنایی انجام می‌دهد "
+    "و سپس فقط بخش‌های مرتبط را به مدل می‌فرستد."
+)
 
 if not API_KEY:
     st.error(
@@ -537,10 +532,7 @@ if ask_button:
                 results,
             )
 
-       st.markdown(
-    '<div class="rtl-title">پاسخ</div>',
-    unsafe_allow_html=True
-)
+        st.subheader("پاسخ")
 
         st.markdown(answer)
 
