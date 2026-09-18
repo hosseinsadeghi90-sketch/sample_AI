@@ -3,7 +3,6 @@ import pickle
 import re
 import os
 from pathlib import Path
-
 import numpy as np
 import requests
 import streamlit as st
@@ -350,12 +349,9 @@ def split_text(text: str):
     به دلیل محدودیت توکن مدل embedding، chunk کوچک انتخاب شده است.
     """
     text = re.sub(r"\n{3,}", "\n\n", text)
-
     words = text.split()
-
     if not words:
         return []
-
     step = CHUNK_SIZE - CHUNK_OVERLAP
     chunks = []
 
@@ -368,8 +364,6 @@ def split_text(text: str):
         chunks.append(" ".join(chunk_words))
 
     return chunks
-    
-
 # =========================================================
 # دریافت فایل
 # =========================================================
@@ -383,8 +377,6 @@ def download_file():
     response.raise_for_status()
 
     return response.text
-
-
 # =========================================================
 # Embedding
 # =========================================================
