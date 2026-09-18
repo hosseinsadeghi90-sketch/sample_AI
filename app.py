@@ -1,6 +1,7 @@
 import hashlib
 import pickle
 import re
+import os
 from pathlib import Path
 
 import numpy as np
@@ -63,7 +64,7 @@ def get_api_key():
     try:
         return st.secrets["OPENROUTER_API_KEY"]
     except Exception:
-        return None
+        return os.getenv("OPENROUTER_API_KEY")
 
 
 API_KEY = get_api_key()
