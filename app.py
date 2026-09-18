@@ -54,18 +54,22 @@ st.markdown("""
 html, body, [class*="css"] {
     direction: rtl;
     text-align: right;
-    font-family: 'Vazirmatn', Tahoma, sans-serif;
+    font-family: 'Vazirmatn', Tahoma, sans-serif !important;
 }
 
 .stApp {
     direction: rtl;
+    font-family: 'Vazirmatn', Tahoma, sans-serif !important;
 }
 
-h1, h2, h3, p, div {
-    direction: rtl;
-    text-align: right;
+p, span, div, input, textarea, button {
+    font-family: 'Vazirmatn', Tahoma, sans-serif !important;
 }
 
+input, textarea {
+    direction: rtl !important;
+    text-align: right !important;
+}
 .stTextInput > div > div > input {
     direction: rtl;
     text-align: right;
