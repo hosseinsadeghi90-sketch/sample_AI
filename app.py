@@ -348,12 +348,7 @@ def split_text(text: str):
     متن را بر اساس تعداد تقریبی کلمات به chunkهای کوچک تقسیم می‌کند.
     به دلیل محدودیت توکن مدل embedding، chunk کوچک انتخاب شده است.
     """
-
-    text = re.sub(r"
-{3,}", "
-
-", text)
-
+   text = re.sub(r"\n{3,}", "\n\n", text)
     words = text.split()
 
     if not words:
