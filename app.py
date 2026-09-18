@@ -3,6 +3,7 @@ import pickle
 import re
 import os
 from pathlib import Path
+
 import numpy as np
 import requests
 import streamlit as st
@@ -348,7 +349,8 @@ def split_text(text: str):
     متن را بر اساس تعداد تقریبی کلمات به chunkهای کوچک تقسیم می‌کند.
     به دلیل محدودیت توکن مدل embedding، chunk کوچک انتخاب شده است.
     """
-   text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
     words = text.split()
 
     if not words:
@@ -366,7 +368,7 @@ def split_text(text: str):
         chunks.append(" ".join(chunk_words))
 
     return chunks
-
+    
 
 # =========================================================
 # دریافت فایل
