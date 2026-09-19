@@ -3,7 +3,6 @@ import pickle
 import re
 import os
 from pathlib import Path
-
 import numpy as np
 import requests
 import streamlit as st
@@ -294,12 +293,15 @@ def create_document(file_hash, chunk_count):
             "embedding_model": EMBEDDING_MODEL
         })
         .select("id")
-        .single()
         .execute()
     )
 
-    return response.data["id"]
+    if not response.data:
+        raise RuntimeError(
+            "رکورد Document در Supabase ساخته نشد."
+        )
 
+    return response.data[0]["id"]
 
 # =========================================================
 # ذخیره Chunkها و Embeddingها در Supabase
