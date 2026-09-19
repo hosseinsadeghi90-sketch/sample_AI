@@ -2,6 +2,7 @@ import hashlib
 import pickle
 import re
 import os
+import uuid
 from pathlib import Path
 import numpy as np
 import requests
@@ -128,7 +129,8 @@ def get_supabase():
     )
 
 supabase = get_supabase()
-
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
 
 # =========================================================
 # توابع کمکی
@@ -145,14 +147,24 @@ def get_headers():
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json",
     }
+def save_message(role, content):
+    response = (
+        supabase
+        .table("messages")
+        .insert({
+            "session_id": st.session_state.session_id,
+            "role": role,
+            "content": content
+        })
+        .execute()
+    )
 
+    return response
 
 def calculate_hash(text: str) -> str:
     return hashlib.sha256(
         text.encode("utf-8")
     ).hexdigest()
-
-
 def split_text(text: str):
     """
     متن را بر اساس تعداد تقریبی کلمات به chunkهای کوچک تقسیم می‌کند.
@@ -627,7 +639,8 @@ if ask_button:
                 question,
                 results,
             )
-
+save_message("user", question)
+save_message("assistant", answer)
         st.subheader("پاسخ")
 
         st.markdown(answer)
