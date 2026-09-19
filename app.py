@@ -8,6 +8,8 @@ import numpy as np
 import requests
 import streamlit as st
 
+from supabase import create_client
+
 # =========================================================
 # تنظیمات
 # =========================================================
@@ -33,7 +35,6 @@ CHUNK_OVERLAP = 15
 # چند chunk مرتبط به مدل Chat فرستاده شود
 TOP_K = 5
 
-CACHE_FILE = Path("embedding_cache.pkl")
 
 
 # =========================================================
@@ -108,6 +109,26 @@ def get_api_key():
 
 
 API_KEY = get_api_key()
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY")
+
+if not SUPABASE_URL:
+    st.error("SUPABASE_URL تنظیم نشده است.")
+    st.stop()
+
+if not SUPABASE_SECRET_KEY:
+    st.error("SUPABASE_SECRET_KEY تنظیم نشده است.")
+    st.stop()
+
+@st.cache_resource
+def get_supabase():
+    return create_client(
+        SUPABASE_URL,
+        SUPABASE_SECRET_KEY
+    )
+
+supabase = get_supabase()
 
 
 # =========================================================
@@ -237,39 +258,95 @@ def create_embeddings(texts):
 
 
 # =========================================================
-# Cache embedding
+# پیدا کردن فایل index شده در Supabase
 # =========================================================
 
-def load_embedding_cache(file_hash):
-    if not CACHE_FILE.exists():
-        return None
+def get_existing_document(file_hash):
 
-    try:
-        with CACHE_FILE.open("rb") as f:
-            cache = pickle.load(f)
+    response = (
+        supabase
+        .table("documents")
+        .select("id, chunk_count, embedding_model")
+        .eq("file_hash", file_hash)
+        .limit(1)
+        .execute()
+    )
 
-        if cache.get("model") != EMBEDDING_MODEL:
-            return None
+    if response.data:
+        return response.data[0]
 
-        if cache.get("file_hash") != file_hash:
-            return None
-
-        return cache
-
-    except Exception:
-        return None
+    return None
 
 
-def save_embedding_cache(file_hash, chunks, embeddings):
-    cache = {
-        "model": EMBEDDING_MODEL,
-        "file_hash": file_hash,
-        "chunks": chunks,
-        "embeddings": embeddings,
-    }
+# =========================================================
+# ساخت رکورد Document
+# =========================================================
 
-    with CACHE_FILE.open("wb") as f:
-        pickle.dump(cache, f)
+def create_document(file_hash, chunk_count):
+
+    response = (
+        supabase
+        .table("documents")
+        .insert({
+            "file_hash": file_hash,
+            "source_url": FILE_URL,
+            "chunk_count": chunk_count,
+            "embedding_model": EMBEDDING_MODEL
+        })
+        .select("id")
+        .single()
+        .execute()
+    )
+
+    return response.data["id"]
+
+
+# =========================================================
+# ذخیره Chunkها و Embeddingها در Supabase
+# =========================================================
+
+def save_chunks(document_id, chunks, embeddings):
+
+    rows = []
+
+    for index, (chunk, embedding) in enumerate(
+        zip(chunks, embeddings)
+    ):
+        rows.append({
+            "document_id": document_id,
+            "chunk_index": index,
+            "content": chunk,
+            "embedding": embedding
+        })
+
+    batch_size = 20
+
+    progress = st.progress(
+        0,
+        text="در حال ذخیره embeddingها در Supabase..."
+    )
+
+    total = len(rows)
+
+    for start in range(0, total, batch_size):
+
+        batch = rows[start:start + batch_size]
+
+        (
+            supabase
+            .table("document_chunks")
+            .insert(batch)
+            .execute()
+        )
+
+        done = min(start + len(batch), total)
+
+        progress.progress(
+            done / total,
+            text=f"ذخیره embeddingها... {done}/{total}"
+        )
+
+    progress.empty()
 
 
 # =========================================================
@@ -278,29 +355,45 @@ def save_embedding_cache(file_hash, chunks, embeddings):
 
 @st.cache_resource(show_spinner=False)
 def prepare_index(file_text, file_hash):
-    cached = load_embedding_cache(file_hash)
 
-    if cached is not None:
+    existing = get_existing_document(
+        file_hash
+    )
+
+    if existing is not None:
         return (
-            cached["chunks"],
-            cached["embeddings"],
-            True,
+            existing["id"],
+            existing["chunk_count"],
+            True
         )
 
-    chunks = split_text(file_text)
+    chunks = split_text(
+        file_text
+    )
 
     if not chunks:
         raise RuntimeError("فایل خالی است.")
 
-    embeddings = create_embeddings(chunks)
-
-    save_embedding_cache(
-        file_hash,
-        chunks,
-        embeddings,
+    embeddings = create_embeddings(
+        chunks
     )
 
-    return chunks, embeddings, False
+    document_id = create_document(
+        file_hash,
+        len(chunks)
+    )
+
+    save_chunks(
+        document_id,
+        chunks,
+        embeddings
+    )
+
+    return (
+        document_id,
+        len(chunks),
+        False
+    )
 
 
 # =========================================================
@@ -308,14 +401,15 @@ def prepare_index(file_text, file_hash):
 # =========================================================
 
 def embed_query(question):
+
     response = requests.post(
         f"{BASE_URL}/embeddings",
         headers=get_headers(),
         json={
             "model": EMBEDDING_MODEL,
-            "input": question,
+            "input": question
         },
-        timeout=60,
+        timeout=60
     )
 
     if response.status_code != 200:
@@ -327,46 +421,47 @@ def embed_query(question):
 
     result = response.json()
 
-    return np.array(
-        result["data"][0]["embedding"],
-        dtype=np.float32,
-    )
+    return result["data"][0]["embedding"]
 
 
 # =========================================================
-# Semantic Search
+# Semantic Search در Supabase
 # =========================================================
 
-def semantic_search(question, chunks, embeddings, top_k=TOP_K):
-    query_vector = embed_query(question)
+def semantic_search(
+    document_id,
+    question,
+    top_k=TOP_K
+):
 
-    matrix = np.asarray(
-        embeddings,
-        dtype=np.float32,
+    query_embedding = embed_query(
+        question
     )
 
-    query_norm = np.linalg.norm(query_vector)
-    matrix_norm = np.linalg.norm(matrix, axis=1)
-
-    similarities = (
-        np.dot(matrix, query_vector)
-        / (matrix_norm * query_norm + 1e-10)
-    )
-
-    top_indices = np.argsort(similarities)[-top_k:][::-1]
-
-    results = []
-
-    for index in top_indices:
-        results.append(
+    response = (
+        supabase
+        .rpc(
+            "match_document_chunks",
             {
-                "chunk": chunks[index],
-                "score": float(similarities[index]),
-                "index": int(index),
+                "query_embedding": query_embedding,
+                "match_count": top_k,
+                "p_document_id": document_id
             }
         )
+        .execute()
+    )
 
-    return results
+    if not response.data:
+        return []
+
+    return [
+        {
+            "chunk": row["content"],
+            "score": float(row["similarity"]),
+            "index": int(row["chunk_index"])
+        }
+        for row in response.data
+    ]
 
 
 # =========================================================
@@ -460,7 +555,7 @@ st.write(
 if not API_KEY:
     st.error(
         "API Key پیدا نشد. "
-        "لطفاً OPENROUTER_API_KEY را در Streamlit Secrets تنظیم کن."
+        "لطفاً OPENROUTER_API_KEY را در Environment Variables تنظیم کن."
     )
     st.stop()
 
@@ -474,18 +569,18 @@ try:
         file_text = download_file()
         file_hash = calculate_hash(file_text)
 
-        chunks, embeddings, from_cache = prepare_index(
+        document_id, chunk_count, from_database = prepare_index(
             file_text,
             file_hash,
         )
 
-    if from_cache:
+    if from_database:
         st.success(
-            f"فایل آماده است — {len(chunks)} بخش از Cache بارگذاری شد."
+            f"فایل آماده است — {chunk_count} بخش از Supabase بارگذاری شد."
         )
     else:
         st.success(
-            f"فایل آماده شد — {len(chunks)} بخش برای Semantic Search ساخته شد."
+            f"فایل آماده شد — {chunk_count} بخش در Supabase ذخیره شد."
         )
 
 except Exception as e:
@@ -521,9 +616,8 @@ if ask_button:
     try:
         with st.spinner("در حال جستجوی معنایی و دریافت پاسخ..."):
             results = semantic_search(
+                document_id,
                 question,
-                chunks,
-                embeddings,
                 TOP_K,
             )
 
