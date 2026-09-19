@@ -639,8 +639,10 @@ if ask_button:
                 question,
                 results,
             )
-save_message("user", question)
-save_message("assistant", answer)
+
+        save_message("user", question)
+        save_message("assistant", answer)
+
         st.subheader("پاسخ")
 
         st.markdown(answer)
