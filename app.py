@@ -671,14 +671,14 @@ if ask_button:
     TOP_K,
 )
 
-history = get_memory(
-    st.session_state.session_id
+      history = get_memory(
+      st.session_state.session_id
 )
 
-answer = ask_chat(
-    question,
-    results,
-    history,
+     answer = ask_chat(
+     question,
+     results,
+     history,
 )
         save_message("user", question)
         save_message("assistant", answer)
