@@ -665,21 +665,21 @@ if ask_button:
 
     try:
         with st.spinner("در حال جستجوی معنایی و دریافت پاسخ..."):
-           results = semantic_search(
-    document_id,
-    question,
-    TOP_K,
-)
+            results = semantic_search(
+            document_id,
+            question,
+            TOP_K,
+            )
 
-      history = get_memory(
-      st.session_state.session_id
-)
+            history = get_memory(
+            st.session_state.session_id
+             )
 
-     answer = ask_chat(
-     question,
-     results,
-     history,
-)
+            answer = ask_chat(
+                question,
+                results,
+                history,
+            )
         save_message("user", question)
         save_message("assistant", answer)
 
