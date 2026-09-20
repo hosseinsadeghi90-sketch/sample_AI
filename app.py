@@ -225,7 +225,7 @@ def split_text(text: str):
 # دریافت فایل
 # =========================================================
 
-@st.cache_data(show_spinner=False)
+# @st.cache_data(show_spinner=False)
 def download_file():
     response = requests.get(
         FILE_URL,
