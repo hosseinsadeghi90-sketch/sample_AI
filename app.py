@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import requests
 import streamlit as st
-
+from datetime import datetime, timedelta, timezone
 from supabase import create_client
 
 # =========================================================
@@ -34,8 +34,8 @@ CHUNK_OVERLAP = 15
 
 # چند chunk مرتبط به مدل Chat فرستاده شود
 TOP_K = 5
-
-
+MEMORY_MESSAGES = 10
+MEMORY_RETENTION_DAYS = 3
 
 # =========================================================
 # تنظیمات صفحه
@@ -129,9 +129,38 @@ def get_supabase():
     )
 
 supabase = get_supabase()
+delete_old_messages()
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
+#......................................................
+def get_memory(session_id, limit=MEMORY_MESSAGES):
+    response = (
+        supabase
+        .table("messages")
+        .select("role, content, created_at")
+        .eq("session_id", session_id)
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
 
+    messages = response.data or []
+
+    return list(reversed(messages))
+# ........................ delete old memory....................
+def delete_old_messages():
+    cutoff = (
+        datetime.now(timezone.utc)
+        - timedelta(days=MEMORY_RETENTION_DAYS)
+    )
+
+    (
+        supabase
+        .table("messages")
+        .delete()
+        .lt("created_at", cutoff.isoformat())
+        .execute()
+    )
 # =========================================================
 # توابع کمکی
 # =========================================================
@@ -482,7 +511,7 @@ def semantic_search(
 # Chat
 # =========================================================
 
-def ask_chat(question, results):
+def ask_chat(question, results, history):
     context_parts = []
 
     for i, result in enumerate(results):
@@ -497,12 +526,10 @@ def ask_chat(question, results):
 
     context = "\n".join(context_parts)
 
-    payload = {
-        "model": CHAT_MODEL,
-        "messages": [
-            {
-                "role": "system",
-                "content": """
+    messages = [
+        {
+            "role": "system",
+            "content": """
 تو یک دستیار تحقیقاتی هستی.
 
 بر اساس بخش‌های بازیابی‌شده از فایل
@@ -517,10 +544,18 @@ def ask_chat(question, results):
 
 پاسخ را به زبان فارسی، دقیق و خوانا بنویس.
 """
-            },
-            {
-                "role": "user",
-                "content": f"""
+        }
+    ]
+
+    for message in history:
+        messages.append({
+            "role": message["role"],
+            "content": message["content"]
+        })
+
+    messages.append({
+        "role": "user",
+        "content": f"""
 بخش‌های مرتبط فایل:
 
 {context}
@@ -531,8 +566,11 @@ def ask_chat(question, results):
 
 {question}
 """
-            },
-        ],
+    })
+
+    payload = {
+        "model": CHAT_MODEL,
+        "messages": messages,
     }
 
     response = requests.post(
@@ -552,8 +590,6 @@ def ask_chat(question, results):
     result = response.json()
 
     return result["choices"][0]["message"]["content"]
-
-
 # =========================================================
 # رابط کاربری
 # =========================================================
@@ -629,17 +665,21 @@ if ask_button:
 
     try:
         with st.spinner("در حال جستجوی معنایی و دریافت پاسخ..."):
-            results = semantic_search(
-                document_id,
-                question,
-                TOP_K,
-            )
+           results = semantic_search(
+    document_id,
+    question,
+    TOP_K,
+)
 
-            answer = ask_chat(
-                question,
-                results,
-            )
+history = get_memory(
+    st.session_state.session_id
+)
 
+answer = ask_chat(
+    question,
+    results,
+    history,
+)
         save_message("user", question)
         save_message("assistant", answer)
 
