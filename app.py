@@ -129,6 +129,7 @@ def get_supabase():
     )
 
 supabase = get_supabase()
+
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 #......................................................
@@ -160,7 +161,9 @@ def delete_old_messages():
         .lt("created_at", cutoff.isoformat())
         .execute()
     )
+
 delete_old_messages()
+
 # =========================================================
 # توابع کمکی
 # =========================================================
@@ -225,7 +228,6 @@ def split_text(text: str):
 # دریافت فایل
 # =========================================================
 
-# @st.cache_data(show_spinner=False)
 def download_file():
     response = requests.get(
         FILE_URL,
@@ -316,6 +318,33 @@ def get_existing_document(file_hash):
         return response.data[0]
 
     return None
+
+
+def get_previous_document():
+    response = (
+        supabase
+        .table("documents")
+        .select("id, file_hash, created_at")
+        .eq("source_url", FILE_URL)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+
+    if response.data:
+        return response.data[0]
+
+    return None
+
+
+def delete_document(document_id):
+    (
+        supabase
+        .table("documents")
+        .delete()
+        .eq("id", document_id)
+        .execute()
+    )
 
 
 # =========================================================
@@ -410,6 +439,8 @@ def prepare_index(file_text, file_hash):
             True
         )
 
+    previous = get_previous_document()
+
     chunks = split_text(
         file_text
     )
@@ -421,6 +452,7 @@ def prepare_index(file_text, file_hash):
         chunks
     )
 
+    # نسخه جدید ابتدا کامل ساخته و ذخیره می‌شود.
     document_id = create_document(
         file_hash,
         len(chunks)
@@ -431,6 +463,11 @@ def prepare_index(file_text, file_hash):
         chunks,
         embeddings
     )
+
+    # فقط بعد از موفقیت نسخه جدید، نسخه قبلی حذف می‌شود.
+    if previous is not None:
+        if previous["id"] != document_id:
+            delete_document(previous["id"])
 
     return (
         document_id,
