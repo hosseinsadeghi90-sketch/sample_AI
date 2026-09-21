@@ -424,8 +424,6 @@ def save_chunks(document_id, chunks, embeddings):
 # =========================================================
 # آماده‌سازی فایل
 # =========================================================
-
-@st.cache_resource(show_spinner=False)
 def prepare_index(file_text, file_hash):
 
     existing = get_existing_document(
