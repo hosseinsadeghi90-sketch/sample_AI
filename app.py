@@ -37,6 +37,7 @@ CHUNK_OVERLAP = 15
 TOP_K = 5
 MEMORY_MESSAGES = 10
 MEMORY_RETENTION_DAYS = 3
+MAX_TOOL_ROUNDS = 3
 
 # =========================================================
 # تنظیمات صفحه
@@ -631,47 +632,82 @@ def ask_chat(question, results, history):
 """
     })
 
-    payload = {
-        "model": CHAT_MODEL,
-        "messages": messages,
-        "tools": tools,
-    }
+    for _ in range(MAX_TOOL_ROUNDS):
+        payload = {
+            "model": CHAT_MODEL,
+            "messages": messages,
+            "tools": tools,
+        }
 
-    response = requests.post(
-        f"{BASE_URL}/chat/completions",
-        headers=get_headers(),
-        json=payload,
-        timeout=120,
-    )
-
-    if response.status_code != 200:
-        raise RuntimeError(
-            "Chat Error "
-            f"{response.status_code}\n\n"
-            f"{response.text}"
+        response = requests.post(
+            f"{BASE_URL}/chat/completions",
+            headers=get_headers(),
+            json=payload,
+            timeout=120,
         )
 
-    result = response.json()
-
-    message = result["choices"][0]["message"]
-
-    if "tool_calls" in message:
-        tool_call = message["tool_calls"][0]
-
-        function_name = tool_call["function"]["name"]
-
-        arguments = json.loads(
-            tool_call["function"]["arguments"]
-        )
-
-        if function_name == "get_student_age":
-            tool_result = get_student_age(
-                arguments["name"]
+        if response.status_code != 200:
+            raise RuntimeError(
+                "Chat Error "
+                f"{response.status_code}\n\n"
+                f"{response.text}"
             )
 
-            return f"نتیجه ابزار: {tool_result}"
+        result = response.json()
+        message = result["choices"][0]["message"]
+        tool_calls = message.get("tool_calls") or []
 
-    return message["content"]
+        if not tool_calls:
+            return message.get("content") or ""
+
+        # پاسخ assistant که شامل tool_calls است باید
+        # قبل از tool result دوباره به history همان request اضافه شود.
+        messages.append({
+            "role": "assistant",
+            "content": message.get("content"),
+            "tool_calls": tool_calls,
+        })
+
+        for tool_call in tool_calls:
+            function_name = tool_call["function"]["name"]
+
+            try:
+                arguments = json.loads(
+                    tool_call["function"]["arguments"]
+                )
+            except (json.JSONDecodeError, TypeError) as exc:
+                tool_result = {
+                    "error": f"آرگومان‌های ابزار معتبر نیستند: {exc}"
+                }
+            else:
+                if function_name == "get_student_age":
+                    name = arguments.get("name")
+
+                    if not isinstance(name, str):
+                        tool_result = {
+                            "error": "پارامتر name باید از نوع string باشد."
+                        }
+                    else:
+                        tool_result = {
+                            "age": get_student_age(name)
+                        }
+                else:
+                    tool_result = {
+                        "error": f"ابزار ناشناخته است: {function_name}"
+                    }
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call["id"],
+                "content": json.dumps(
+                    tool_result,
+                    ensure_ascii=False,
+                ),
+            })
+
+    raise RuntimeError(
+        "تعداد دفعات اجرای ابزار از حد مجاز بیشتر شد."
+    )
 # =========================================================
 # رابط کاربری
 # =========================================================
@@ -748,14 +784,14 @@ if ask_button:
     try:
         with st.spinner("در حال جستجوی معنایی و دریافت پاسخ..."):
             results = semantic_search(
-            document_id,
-            question,
-            TOP_K,
+                document_id,
+                question,
+                TOP_K,
             )
 
             history = get_memory(
-            st.session_state.session_id
-             )
+                st.session_state.session_id
+            )
 
             answer = ask_chat(
                 question,
