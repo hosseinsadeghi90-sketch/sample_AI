@@ -2,6 +2,7 @@ import hashlib
 import pickle
 import re
 import os
+import json
 import uuid
 from pathlib import Path
 import numpy as np
@@ -655,9 +656,20 @@ def ask_chat(question, results, history):
     message = result["choices"][0]["message"]
 
     if "tool_calls" in message:
-        st.write("Tool Call:")
-        st.write(message["tool_calls"])
-        return "مدل درخواست استفاده از ابزار را داده است."
+        tool_call = message["tool_calls"][0]
+
+        function_name = tool_call["function"]["name"]
+
+        arguments = json.loads(
+            tool_call["function"]["arguments"]
+        )
+
+        if function_name == "get_student_age":
+            tool_result = get_student_age(
+                arguments["name"]
+            )
+
+            return f"نتیجه ابزار: {tool_result}"
 
     return message["content"]
 # =========================================================
