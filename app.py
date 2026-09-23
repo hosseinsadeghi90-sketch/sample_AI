@@ -179,6 +179,32 @@ def get_headers():
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json",
     }
+#...................... tool function 1...................
+def get_student_age(name):
+    if name == "علی":
+        return 36
+
+    return None
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_student_age",
+            "description": "سن یک دانش‌آموز را بر اساس نام او برمی‌گرداند.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "نام دانش‌آموز"
+                    }
+                },
+                "required": ["name"]
+            }
+        }
+    }
+]
+#...............................................
 def save_message(role, content):
     response = (
         supabase
@@ -424,6 +450,7 @@ def save_chunks(document_id, chunks, embeddings):
 # =========================================================
 # آماده‌سازی فایل
 # =========================================================
+
 def prepare_index(file_text, file_hash):
 
     existing = get_existing_document(
@@ -606,6 +633,7 @@ def ask_chat(question, results, history):
     payload = {
         "model": CHAT_MODEL,
         "messages": messages,
+        "tools": tools,
     }
 
     response = requests.post(
@@ -624,7 +652,14 @@ def ask_chat(question, results, history):
 
     result = response.json()
 
-    return result["choices"][0]["message"]["content"]
+    message = result["choices"][0]["message"]
+
+    if "tool_calls" in message:
+        st.write("Tool Call:")
+        st.write(message["tool_calls"])
+        return "مدل درخواست استفاده از ابزار را داده است."
+
+    return message["content"]
 # =========================================================
 # رابط کاربری
 # =========================================================
