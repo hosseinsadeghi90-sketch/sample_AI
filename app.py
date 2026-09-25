@@ -204,6 +204,23 @@ tools = [
                 "required": ["name"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "rag_search",
+            "description": "برای پیدا کردن اطلاعات مرتبط در فایل دانش، جست‌وجوی معنایی انجام می‌دهد. وقتی پاسخ سؤال از محتوای فایل می‌آید، از این ابزار استفاده کن.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "سؤالی که باید در محتوای فایل جست‌وجو شود"
+                    }
+                },
+                "required": ["question"]
+            }
+        }
     }
 ]
 #...............................................
@@ -575,36 +592,24 @@ def semantic_search(
 # Chat
 # =========================================================
 
-def ask_chat(question, results, history):
-    context_parts = []
-
-    for i, result in enumerate(results):
-        context_parts.append(
-            f"""
---- بخش {i + 1} ---
-امتیاز شباهت: {result["score"]:.4f}
-
-{result["chunk"]}
-"""
-        )
-
-    context = "\n".join(context_parts)
-
+def ask_chat(question, history, document_id, top_k=TOP_K):
     messages = [
         {
             "role": "system",
             "content": """
 تو یک دستیار تحقیقاتی هستی.
 
-بر اساس بخش‌های بازیابی‌شده از فایل
-به سؤال کاربر پاسخ بده.
+دو ابزار در اختیار داری:
+1. get_student_age برای به‌دست‌آوردن سن دانش‌آموز.
+2. rag_search برای پیدا کردن اطلاعات مرتبط در فایل.
 
-پاسخ باید تا حد امکان بر اساس متن
-ارائه‌شده باشد.
+خودت بر اساس سؤال کاربر تصمیم بگیر که آیا به ابزار نیاز داری و کدام ابزار را باید استفاده کنی.
+اگر پاسخ به اطلاعات داخل فایل وابسته است، از rag_search استفاده کن.
+اگر پاسخ به سن دانش‌آموز وابسته است، از get_student_age استفاده کن.
+اگر برای پاسخ به هر دو نیاز داری، می‌توانی هر دو ابزار را در یک مرحله یا در چند مرحله استفاده کنی.
 
-اگر پاسخ در بخش‌های بازیابی‌شده وجود ندارد،
-صادقانه بگو که اطلاعات کافی در متن‌های
-بازیابی‌شده وجود ندارد.
+پس از دریافت نتیجه ابزار، بر اساس نتیجه ابزار و اطلاعات مکالمه پاسخ نهایی را بساز.
+هرگز اطلاعاتی را که ابزارها ارائه نکرده‌اند، حدس نزن.
 
 پاسخ را به زبان فارسی، دقیق و خوانا بنویس.
 """
@@ -619,24 +624,17 @@ def ask_chat(question, results, history):
 
     messages.append({
         "role": "user",
-        "content": f"""
-بخش‌های مرتبط فایل:
-
-{context}
-
-================================
-
-سؤال کاربر:
-
-{question}
-"""
+        "content": question
     })
+
+    retrieved_results = []
 
     for _ in range(MAX_TOOL_ROUNDS):
         payload = {
             "model": CHAT_MODEL,
             "messages": messages,
             "tools": tools,
+            "tool_choice": "auto",
         }
 
         response = requests.post(
@@ -658,10 +656,8 @@ def ask_chat(question, results, history):
         tool_calls = message.get("tool_calls") or []
 
         if not tool_calls:
-            return message.get("content") or ""
+            return message.get("content") or "", retrieved_results
 
-        # پاسخ assistant که شامل tool_calls است باید
-        # قبل از tool result دوباره به history همان request اضافه شود.
         messages.append({
             "role": "assistant",
             "content": message.get("content"),
@@ -688,9 +684,38 @@ def ask_chat(question, results, history):
                             "error": "پارامتر name باید از نوع string باشد."
                         }
                     else:
+                        age = get_student_age(name)
+
+                        if age is None:
+                            tool_result = {
+                                "error": f"اطلاعات سن برای «{name}» پیدا نشد."
+                            }
+                        else:
+                            tool_result = {
+                                "name": name,
+                                "age": age,
+                            }
+
+                elif function_name == "rag_search":
+                    search_question = arguments.get("question")
+
+                    if not isinstance(search_question, str):
                         tool_result = {
-                            "age": get_student_age(name)
+                            "error": "پارامتر question باید از نوع string باشد."
                         }
+                    else:
+                        rag_results = semantic_search(
+                            document_id,
+                            search_question,
+                            top_k,
+                        )
+
+                        retrieved_results.extend(rag_results)
+
+                        tool_result = {
+                            "results": rag_results
+                        }
+
                 else:
                     tool_result = {
                         "error": f"ابزار ناشناخته است: {function_name}"
@@ -715,9 +740,8 @@ def ask_chat(question, results, history):
 st.title("🤖 پرسش از فایل با هوش مصنوعی")
 
 st.write(
-    "سؤال خود را درباره محتوای فایل وارد کنید. "
-    "سیستم ابتدا جست‌وجوی معنایی انجام می‌دهد "
-    "و سپس فقط بخش‌های مرتبط را به مدل می‌فرستد."
+    "سؤال خود را وارد کنید. سیستم بر اساس سؤال تصمیم می‌گیرد "
+    "که از ابزار سن دانش‌آموز، جست‌وجوی فایل، یا هر دو استفاده کند."
 )
 
 if not API_KEY:
@@ -782,22 +806,18 @@ if ask_button:
         st.stop()
 
     try:
-        with st.spinner("در حال جستجوی معنایی و دریافت پاسخ..."):
-            results = semantic_search(
-                document_id,
-                question,
-                TOP_K,
-            )
-
+        with st.spinner("در حال فکر کردن و استفاده از ابزارهای لازم..."):
             history = get_memory(
                 st.session_state.session_id
             )
 
-            answer = ask_chat(
+            answer, results = ask_chat(
                 question,
-                results,
                 history,
+                document_id,
+                TOP_K,
             )
+
         save_message("user", question)
         save_message("assistant", answer)
 
@@ -805,14 +825,15 @@ if ask_button:
 
         st.markdown(answer)
 
-        with st.expander("مشاهده بخش‌های بازیابی‌شده"):
-            for i, result in enumerate(results):
-                st.markdown(
-                    f"**بخش {i + 1} — "
-                    f"Similarity: {result['score']:.4f}**"
-                )
-                st.write(result["chunk"])
-                st.divider()
+        if results:
+            with st.expander("مشاهده بخش‌های بازیابی‌شده"):
+                for i, result in enumerate(results):
+                    st.markdown(
+                        f"**بخش {i + 1} — "
+                        f"Similarity: {result['score']:.4f}**"
+                    )
+                    st.write(result["chunk"])
+                    st.divider()
 
     except Exception as e:
         st.error(
